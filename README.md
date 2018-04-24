@@ -4,7 +4,7 @@ Simple example showing a flat-shaded rotating cube with one static directional l
 
 The code is written in C and requires the Psy-Q SDK, which was the official SDK bundled with the Sony Playstation 1 Development kit.
 
-The thing to take away from this example is the light, which might be a little difficult for some to understand.
+The thing to take away from this example is the lighting, which is explained in a pretty complicated way in the SDK, but in reality is pretty simple.
 
 The basic lighting system on the PSX has 3 parallel lights in 3 user defined colors. On modern engines/systems these are usually called directional lights. A parallel light is named this way because it has an infinite amount of light rays in parallel to eachother throughout the entire scene. So unlike a spot-light, they are basicially everywhere. That means that to represent a parallel light, we only need 2 things:
 
