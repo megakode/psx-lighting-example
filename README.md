@@ -11,18 +11,18 @@ The basic lighting system on the PSX has 3 parallel lights in 3 user defined col
 * A vector for the direction
 * RGB values for the color
 
-On the PSX, these things are stored in two constant matrices called the __local light matrix__ and the __local color matrix__.
+On the PSX, these things are stored in two constant matrices called the __local light matrix__ and the __local color matrix__. These can be set using the __SetLightMatrix__ and __SetColorMatrix__ functions. 
 
-These can be set using the __SetLightMatrix__ and __SetColorMatrix__ functions. The format of these matrices are as follows:
+The format of these matrices are as follows:
 
-__Local light matrix__
+__Local light matrix__ stores direction for all 3 lights:
 
 | L1x | L1y | L1z |
 |-----|-----|-----|
 | L2x | L2y | L2z |
 | L3x | L3y | L3z |
 
-__Local color matrix:__
+__Local color matrix:__ stores color of all 3 lights:
 
 | L1r | L2r | L3r |
 |-----|-----|-----|
