@@ -4,7 +4,7 @@
 #include <libgpu.h>
 
 
-#define MAXOBJS 18
+#define MAXOBJS 6
 
 #define	OTSIZE	(4096)
 
@@ -85,10 +85,6 @@ void addCube(u_long *ot, POLY_F4 *s,VECTOR *posVec,SVECTOR *rotVecs);
 
 int main()
 {
-	u_long	*otIndex;		
-	POLY_F4	*polyIndex;
-	
-	int i;
 	SVECTOR	rotAngVec  = { 0, 0, 0};
 	VECTOR	posVec  = {0, 0, 2*SCR_Z};
 	
@@ -117,7 +113,7 @@ int main()
 	
 	while (1) 
 	{
-		cdb  = (cdb==db)? db+1: db;	
+		cdb  = (cdb==db)? db+1: db;	// Switch double buffer
 		
 		ClearOTagR(cdb->ot, OTSIZE);	
 		
@@ -128,24 +124,6 @@ int main()
 		// transpose + light + perspective + add to OT
 		addCube(cdb->ot, cdb->polys, &posVec,&rotAngVec);
 		
-		posVec.vx += 150;
-		rotAngVec.vx += 150;
-		
-		addCube(cdb->ot, &cdb->polys[6], &posVec,&rotAngVec);
-		
-		posVec.vx -= 300;
-		rotAngVec.vx += 150;
-		
-		addCube(cdb->ot, &cdb->polys[12], &posVec,&rotAngVec);
-		
-		posVec.vx += 150;
-		rotAngVec.vx -= 300;
-		
-		/* for loop that sets position of all primitives in current buffer */
-		
-		otIndex = cdb->ot;
-		polyIndex = cdb->polys;
-
 		
 		DrawSync(0);		
 		VSync(0);
@@ -177,6 +155,8 @@ void initPrimitives(DB *buffer)
 	buffer->draw.isbg = 1;
 	setRGB0(&buffer->draw, 60, 120, 120);
 	
+	// Initialize all primitive structs
+	
 	for(poly = buffer->polys;i<MAXOBJS;i++,poly++)
 	{
 		SetPolyF4(poly);
@@ -186,11 +166,11 @@ void initPrimitives(DB *buffer)
 
 // ***************************************************
 //
-//	addCube
+//  addCube
 //
-//	takes a POLY_F4 primitive and does:
+//  takes a POLY_F4 primitive and does:
 //  - coordinate and perspective transform
-//	- light calc 
+//  - light calculation
 //  - add to OT
 //
 // ***************************************************
@@ -209,11 +189,31 @@ void addCube(u_long *ot, POLY_F4 *s,VECTOR *posVec,SVECTOR *rotVecs)
 	MATRIX	inverseLightMatrix;
 	SVECTOR inverseLightVector;
 	
-	// Create a rotation matrix for the light, with the negated rotation from the cube.
+	// When we call the RotAverageNclip4 all the surfaces are rotated using the rotation matrix set with RotMatrix.
+	// The problem is, the precalculated normals we pass to the light calculation function are static, and does therefore not rotate with the cube.
+	// So when we set the colors returned from the light calculation function NormalColorCol back onto the surfaces, it appears as if the light is
+	// following the cubes rotation.
+	//
+	// To counter this, we can do 1 of two things:
+	// A) recalculate the rotated normals of every surface on every frame
+	// B) just counter-rotate the light itself
+	// 
+	// The logical thing is to do B: counter rotate the light, by setting the negated cube rotation into the light matrix.
+	// So if we rotate the cube 10 degree, we rotate the light -10 degree, and then the light will appear to be static in world space as we want.
+	
+	// Create a rotation matrix for the light:
 
 	inverseLightVector.vx = -rotVecs->vx;
 	inverseLightVector.vy = -rotVecs->vy;
 	inverseLightVector.vz = -rotVecs->vz;
+	
+	// To see the problem we get from not couter-rotating the light, uncomment the 3 lines below:
+	/*
+	inverseLightVector.vx = 0;
+	inverseLightVector.vy = 0;
+	inverseLightVector.vz = 0;
+	*/
+	
 	RotMatrixZYX(&inverseLightVector,&inverseLightMatrix); // The reverse axis sequence of the normal RotMatrix() function, to counter the rotation
 	ApplyMatrixSV(&inverseLightMatrix,(SVECTOR*)&lightDirVec,(SVECTOR*)&llm);
 	
@@ -231,17 +231,19 @@ void addCube(u_long *ot, POLY_F4 *s,VECTOR *posVec,SVECTOR *rotVecs)
 	SetTransMatrix(&rottrans);	
 	
 
-	// ***************
-
 	vp = vertices;		/* vp: vertex pointer (work) */
 	np = normals;		/* np: normal pointer (work) */
+	
+	// Loop through all 6 surfaces and render them
 
 	for (i = 0; i < 6; i++, s++, vp += 4, np++) {
 
+	SetRotMatrix(&rottrans);		
+	
 		isomote = RotAverageNclip4(vp[0], vp[1], vp[2], vp[3], 
 			(long *)&s->x0, (long *)&s->x1, 
 			(long *)&s->x3, (long *)&s->x2, &p, &otz, &flg);
-
+			
 		if (isomote <= 0) continue;	
 
 		/* Put into OT:
