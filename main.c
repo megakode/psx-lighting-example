@@ -106,6 +106,7 @@ int main()
 	SetDefDispEnv(&db[1].disp, 0,   0, 320, 240);
 	
 	SetBackColor(100,100,100);
+	SetColorMatrix(&lcm);
 	
 	initPrimitives(&db[0]);
 	initPrimitives(&db[1]);
@@ -123,7 +124,6 @@ int main()
 		
 		// transpose + light + perspective + add to OT
 		addCube(cdb->ot, cdb->polys, &posVec,&rotAngVec);
-		
 		
 		DrawSync(0);		
 		VSync(0);
@@ -151,6 +151,8 @@ void initPrimitives(DB *buffer)
 		
 	int i = 0;
 	POLY_F4 *poly;
+	
+	// Set the background color for this buffer
 	
 	buffer->draw.isbg = 1;
 	setRGB0(&buffer->draw, 60, 120, 120);
@@ -185,54 +187,29 @@ void addCube(u_long *ot, POLY_F4 *s,VECTOR *posVec,SVECTOR *rotVecs)
 	CVECTOR colorOut;
 	SVECTOR normal;
 	MATRIX rottrans;
-	
 	MATRIX	inverseLightMatrix;
-	SVECTOR inverseLightVector;
 	
-	// When we call the RotAverageNclip4 all the surfaces are rotated using the rotation matrix set with RotMatrix.
-	// The problem is, the precalculated normals we pass to the light calculation function are static, and does therefore not rotate with the cube.
-	// So when we set the colors returned from the light calculation function NormalColorCol back onto the surfaces, it appears as if the light is
-	// following the cubes rotation.
-	//
-	// To counter this, we can do 1 of two things:
-	// A) recalculate the rotated normals of every surface on every frame
-	// B) just counter-rotate the light itself
-	// 
-	// The logical thing is to do B: counter rotate the light, by setting the negated cube rotation into the light matrix.
-	// So if we rotate the cube 10 degree, we rotate the light -10 degree, and then the light will appear to be static in world space as we want.
-	
-	// Create a rotation matrix for the light:
-
-	inverseLightVector.vx = -rotVecs->vx;
-	inverseLightVector.vy = -rotVecs->vy;
-	inverseLightVector.vz = -rotVecs->vz;
-	
-	// To see the problem we get from not couter-rotating the light, uncomment the 3 lines below:
-	/*
-	inverseLightVector.vx = 0;
-	inverseLightVector.vy = 0;
-	inverseLightVector.vz = 0;
-	*/
-	
-	RotMatrixZYX(&inverseLightVector,&inverseLightMatrix); // The reverse axis sequence of the normal RotMatrix() function, to counter the rotation
-	ApplyMatrixSV(&inverseLightMatrix,(SVECTOR*)&lightDirVec,(SVECTOR*)&llm);
-	
-	SetColorMatrix(&lcm);
-	SetLightMatrix(&llm);
-	
-	// Create a rotation+transpose matrix for the cube
+	// Create a rotation matrix for the cube
 	
 	RotMatrix_gte(rotVecs, &rottrans);
 	TransMatrix(&rottrans,posVec);
 	
-	//PushMatrix();
+	// Set it as active in the GTE
 	
 	SetRotMatrix(&rottrans);		
 	SetTransMatrix(&rottrans);	
 	
-
-	vp = vertices;		/* vp: vertex pointer (work) */
-	np = normals;		/* np: normal pointer (work) */
+	// Transpose the rotation matrix, so the light does not appear to be following the cubes rotation.
+	// Make a matrix the is the reverse of the rotation we are going to apply to cube, so the
+	// light apperas to be in a fixed position.
+	
+	TransposeMatrix(&rottrans, &inverseLightMatrix);
+	ApplyMatrixSV(&inverseLightMatrix,(SVECTOR*)&lightDirVec,(SVECTOR*)&llm);
+	
+	SetLightMatrix(&llm);
+	
+	vp = vertices;		// vp: vertex pointer
+	np = normals;		// np: normal pointer
 	
 	// Loop through all 6 surfaces and render them
 
@@ -264,5 +241,4 @@ void addCube(u_long *ot, POLY_F4 *s,VECTOR *posVec,SVECTOR *rotVecs)
 		}
 	}
 	
-	//PopMatrix();		
 }
